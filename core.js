@@ -94,8 +94,43 @@ function defaultConfig() {
       { id: "pr-aut", nome: "Prumada de automação", tipo: "automacao" },
     ],
     ambientes: { padrao: [], porFinal: [], excecoes: [] },
+    prestadores: [],
+    concessionarias: [],
+    areasComuns: [],
+    elevadores: [],
   };
 }
+
+/** Garante que configs antigas ganhem os campos novos sem perder nada. */
+function upgradeConfig(cfg) {
+  if (!cfg) return cfg;
+  cfg.prestadores = cfg.prestadores || [];
+  cfg.concessionarias = cfg.concessionarias || [];
+  cfg.areasComuns = cfg.areasComuns || [];
+  cfg.elevadores = cfg.elevadores || [];
+  return cfg;
+}
+
+const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+function fmtGrade(grade) {
+  if (!grade || !grade.length) return "Sem grade definida";
+  return grade.map(g =>
+    (g.dias || []).map(d => DIAS_SEMANA[d]).join(", ") +
+    (g.das ? ` · ${g.das}–${g.ate || "?"}` : "")
+  ).join("  |  ");
+}
+
+const ILUM_INFO = {
+  funcionando: { rotulo: "Funcionando", cor: "var(--st-prop)" },
+  parcial: { rotulo: "Falha parcial", cor: "var(--ob-reta)" },
+  falha: { rotulo: "Com falha", cor: "var(--ob-inicio)" },
+};
+const ELEV_STATUS = {
+  operando: { rotulo: "Operando", cor: "var(--st-prop)" },
+  manutencao: { rotulo: "Em manutenção", cor: "var(--ob-meio)" },
+  parado: { rotulo: "Parado", cor: "var(--ob-inicio)" },
+};
+const ELEV_TIPO = { social: "Social", servico: "Serviço" };
 
 /* ---------------- Store: adaptador de persistência ----------------
    Interface única sobre dois backends:
@@ -120,6 +155,7 @@ const Store = {
       this._loadFromLocal();
     }
     if (!State.config) State.config = defaultConfig();
+    upgradeConfig(State.config);
     State.ready = true;
   },
 
@@ -137,7 +173,7 @@ const Store = {
   _subscribe() {
     const notify = (kind) => { if (this.onRemoteChange) this.onRemoteChange(kind); };
     this._unsubs.push(this.db.doc("app/config").onSnapshot(snap => {
-      if (snap.exists) { State.config = snap.data(); notify("config"); }
+      if (snap.exists) { State.config = upgradeConfig(JSON.parse(JSON.stringify(snap.data()))); notify("config"); }
     }, () => {}));
     this._unsubs.push(this.db.collection("units").limit(1000).onSnapshot(snap => {
       State.units = {}; snap.docs.forEach(d => { State.units[d.id] = d.data(); });
@@ -311,6 +347,10 @@ const AxisgridAdapter = {
       torres: State.config.torres,
       prumadas: State.config.prumadas,
       regrasAmbientes: State.config.ambientes,
+      prestadores: State.config.prestadores,
+      concessionarias: State.config.concessionarias,
+      areasComuns: State.config.areasComuns,
+      elevadores: State.config.elevadores,
       unidades: units,
       obras: Object.entries(State.obras).map(([id, o]) => ({ id, ...o })),
     };
@@ -344,6 +384,31 @@ function sampleDataset() {
     ],
   };
 
+  const hojeRef = todayISO();
+  cfg.prestadores = [
+    { id: "pv-limp", nome: "Limpar+ Conservação", servico: "Limpeza das áreas comuns", tipo: "fixo", telefone: "(00) 0000-0001", grade: [{ dias: [1, 2, 3, 4, 5], das: "07:00", ate: "16:00" }], obs: "" },
+    { id: "pv-pisc", nome: "Água Clara Piscinas", servico: "Tratamento da piscina", tipo: "fixo", telefone: "(00) 0000-0002", grade: [{ dias: [2, 5], das: "08:00", ate: "10:00" }], obs: "" },
+    { id: "pv-jard", nome: "Verde Vivo Jardinagem", servico: "Jardinagem", tipo: "fixo", telefone: "(00) 0000-0003", grade: [{ dias: [1], das: "08:00", ate: "12:00" }], obs: "" },
+    { id: "pv-dedet", nome: "ProTeto Dedetização", servico: "Dedetização semestral", tipo: "esporadico", telefone: "(00) 0000-0004", grade: [], obs: "Última visita em agosto; próxima prevista para fevereiro." },
+  ];
+  cfg.concessionarias = [
+    { id: "cs-1", nome: "FibraNet", tipo: "internet", telefone: "(00) 0000-0010", obs: "Fibra até o DG de cada torre" },
+    { id: "cs-2", nome: "MegaCabo", tipo: "internet_tv", telefone: "(00) 0000-0011", obs: "Internet + TV por assinatura" },
+    { id: "cs-3", nome: "TVSat Assinaturas", tipo: "tv", telefone: "(00) 0000-0012", obs: "Antena coletiva no topo da Torre Ipê" },
+  ];
+  cfg.areasComuns = [
+    { id: "ac-1", nome: "Hall social — Torre Ipê", status: "funcionando", verificadoEm: addDays(hojeRef, -3), obs: "" },
+    { id: "ac-2", nome: "Garagem G1", status: "parcial", verificadoEm: addDays(hojeRef, -1), obs: "Duas luminárias queimadas perto das vagas 31–34" },
+    { id: "ac-3", nome: "Playground", status: "falha", verificadoEm: hojeRef, obs: "Refletor principal não acende" },
+    { id: "ac-4", nome: "Salão de festas", status: "funcionando", verificadoEm: addDays(hojeRef, -10), obs: "" },
+  ];
+  cfg.elevadores = [
+    { id: "el-1", torreId: "T1", nome: "Social 1", tipo: "social", status: "operando", ultimaManut: addDays(hojeRef, -20), proximaManut: addDays(hojeRef, 40), historico: [{ data: addDays(hojeRef, -20), descricao: "Preventiva mensal — tudo em ordem" }] },
+    { id: "el-2", torreId: "T1", nome: "Serviço 1", tipo: "servico", status: "manutencao", ultimaManut: hojeRef, proximaManut: "", historico: [{ data: hojeRef, descricao: "Troca do cabo de tração — previsão de 3 dias parado" }] },
+    { id: "el-3", torreId: "T2", nome: "Social Único", tipo: "social", status: "operando", ultimaManut: addDays(hojeRef, -35), proximaManut: addDays(hojeRef, 25), historico: [] },
+    { id: "el-4", torreId: "T2", nome: "Serviço Único", tipo: "servico", status: "operando", ultimaManut: addDays(hojeRef, -35), proximaManut: addDays(hojeRef, 25), historico: [] },
+  ];
+
   const units = {};
   const nomes = ["Ana Souza", "Bruno Lima", "Carla Mendes", "Diego Rocha", "Elisa Prado", "Fábio Nunes", "Gabriela Reis", "Heitor Alves", "Iara Campos", "João Pedro Dias", "Karen Melo", "Luís Otávio", "Marina Costa", "Nelson Freitas", "Olívia Ramos", "Paulo Sérgio", "Quésia Barros", "Rafael Torres", "Sofia Duarte", "Tiago Moraes"];
   let ni = 0;
@@ -361,10 +426,17 @@ function sampleDataset() {
         status: "inquilino",
         morador: { nome, telefone: tel, email },
         proprietario: { nome: prop, telefone: `(41) 3${String(200 + i)}-0000`, email: prop.toLowerCase().replace(/[^a-z]+/g, ".") + "@email.com" },
-        prazoLocacao: { valor: 30, unidade: "meses", dias: 0 },
+        contrato: { inicio: addDays(hojeRef, -200 - i * 3), fim: addDays(hojeRef, 400 - i * 2) },
+        moradoresFixos: [nome, nomes[(ni + 3) % nomes.length]],
       };
     } else {
-      units[u.id] = { status: "proprietario", morador: { nome, telefone: tel, email } };
+      units[u.id] = { status: "proprietario", morador: { nome, telefone: tel, email }, moradoresFixos: [nome] };
+    }
+    if (units[u.id] && units[u.id].status !== "vago" && i % 5 === 2) {
+      units[u.id].prumadasAtualizadas = {
+        "pr-hidr": { data: addDays(hojeRef, -(40 + i)) },
+        "pr-ele": { data: addDays(hojeRef, -(40 + i)) },
+      };
     }
   });
 

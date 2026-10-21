@@ -11,6 +11,10 @@ const TAB_ICONS = {
   stacking: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.3h18M3 14.6h18M9 4v16M15 4v16"/>',
   obras: '<path d="M14.7 6.3a4 4 0 0 1-5 5L4 17v3h3l5.7-5.7a4 4 0 0 1 5-5l2.6-2.6-2.3-2.3z"/>',
   integracao: '<path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><rect x="4" y="17" width="16" height="4" rx="1.2"/>',
+  prestadores: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5"/><path d="M17 3.5l3.5 3.5-2.5 2.5L14.5 6z"/><path d="M16 8l-2 2"/>',
+  concessionarias: '<path d="M2 9a14 14 0 0 1 20 0"/><path d="M5.5 12.5a9 9 0 0 1 13 0"/><path d="M9 16a4.5 4.5 0 0 1 6 0"/><circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none"/>',
+  areascomuns: '<path d="M12 3a6 6 0 0 1 3.5 10.9c-.6.5-1 1.2-1 2V17h-5v-1.1c0-.8-.4-1.5-1-2A6 6 0 0 1 12 3z"/><path d="M10 20h4"/>',
+  elevadores: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18"/><path d="M7.5 10l1.5-2 1.5 2M7.5 14l1.5 2 1.5-2"/><path d="M15 8h2.5M15 12h2.5M15 16h2.5"/>',
 };
 function tabIcon(id) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_ICONS[id] || ""}</svg>`;
@@ -22,6 +26,10 @@ const ADMIN_TABS = [
   { id: "estrutura", nome: "Torres e andares" },
   { id: "prumadas", nome: "Prumadas verticais" },
   { id: "ambientes", nome: "Ambientes das unidades" },
+  { id: "prestadores", nome: "Prestadores de serviço" },
+  { id: "concessionarias", nome: "Concessionárias" },
+  { id: "areascomuns", nome: "Áreas comuns" },
+  { id: "elevadores", nome: "Elevadores" },
   { id: "stacking", nome: "Stacking plan" },
   { id: "obras", nome: "Obras" },
   { id: "integracao", nome: "Dados e exportação" },
@@ -54,6 +62,7 @@ function renderRail(active) {
   const doneMap = adminTabDone();
   for (const t of ADMIN_TABS) {
     if (t.id === "condominio") rail.append(el("div", { class: "rail-label" }, "Cadastro"));
+    if (t.id === "prestadores") rail.append(el("div", { class: "rail-label" }, "Prédio e serviços"));
     if (t.id === "stacking") rail.append(el("div", { class: "rail-label" }, "Dia a dia"));
     rail.append(el("button", {
       class: (active === t.id ? "active " : "") + (doneMap[t.id] ? "done" : ""),
@@ -72,6 +81,10 @@ function adminTabDone() {
     estrutura: (c.torres || []).length > 0,
     prumadas: (c.prumadas || []).length > 0,
     ambientes: !!((c.ambientes.padrao || []).length || (c.ambientes.porFinal || []).length),
+    prestadores: (c.prestadores || []).length > 0,
+    concessionarias: (c.concessionarias || []).length > 0,
+    areascomuns: (c.areasComuns || []).length > 0,
+    elevadores: (c.elevadores || []).length > 0,
     stacking: comp.ok,
     obras: Object.values(State.obras).some(o => o.status === "submetida"),
     integracao: false,
@@ -96,7 +109,9 @@ function renderAdmin(tab) {
   markDirtyOn(inner);
   const fns = {
     inicio: viewInicio, condominio: viewCondominio, estrutura: viewEstrutura, prumadas: viewPrumadas,
-    ambientes: viewAmbientes, stacking: viewStacking, obras: viewObras, integracao: viewIntegracao,
+    ambientes: viewAmbientes, prestadores: viewPrestadores, concessionarias: viewConcessionarias,
+    areascomuns: viewAreasComuns, elevadores: viewElevadores,
+    stacking: viewStacking, obras: viewObras, integracao: viewIntegracao,
   };
   (fns[tab] || viewInicio)(inner);
 }
@@ -150,6 +165,25 @@ function viewInicio(root) {
   }
 
   const unidades = buildUnits(State.config).length;
+
+  /* avisos do prédio: iluminação com falha e elevadores fora de operação */
+  const avisos = [];
+  for (const a of (State.config.areasComuns || [])) {
+    if (a.status === "falha") avisos.push(`Iluminação com falha: ${a.nome}`);
+    else if (a.status === "parcial") avisos.push(`Iluminação com falha parcial: ${a.nome}`);
+  }
+  for (const ev of (State.config.elevadores || [])) {
+    if (ev.status && ev.status !== "operando") {
+      const t = (State.config.torres.find(x => x.id === ev.torreId) || {}).nome || ev.torreId || "";
+      avisos.push(`Elevador ${ev.nome || ""} (${t}): ${(ELEV_STATUS[ev.status] || {}).rotulo || ev.status}`);
+    }
+  }
+  if (avisos.length) {
+    root.append(el("div", { class: "banner banner-warn", style: "margin-bottom:14px;flex-direction:column;gap:4px" },
+      el("strong", {}, "Atenção no prédio hoje:"),
+      avisos.map(a => el("span", { class: "small" }, "• " + a))));
+  }
+
   root.append(el("div", { class: "home-stats" },
     el("div", { class: "stat-tile" }, el("div", { class: "num" }, String(unidades)), el("div", { class: "lbl" }, "unidades no condomínio")),
     el("div", { class: "stat-tile" }, el("div", { class: "num" }, `${comp.feitos}/${comp.total}`), el("div", { class: "lbl" }, "unidades com morador/status preenchido")),
@@ -162,6 +196,10 @@ function viewInicio(root) {
     ["ambientes", "Ambientes das unidades", done.ambientes ? "Cadastrados — clique para revisar" : "Quais cômodos existem em cada tipo de apartamento"],
     ["stacking", "Stacking plan", comp.ok ? "Mapa completo! Clique para ver e atualizar" : `Faltam ${comp.total - comp.feitos} unidades para completar o mapa`],
     ["obras", "Obras", comp.ok ? "Gere links de obra e acompanhe cada reforma" : "Libera quando o mapa estiver completo"],
+    ["prestadores", "Prestadores de serviço", (State.config.prestadores || []).length ? `${State.config.prestadores.length} equipe(s) cadastrada(s), com grade semanal` : "Equipes fixas e esporádicas que cuidam do prédio"],
+    ["concessionarias", "Concessionárias", (State.config.concessionarias || []).length ? `${State.config.concessionarias.length} operadora(s) de internet e TV` : "Operadoras de internet e TV que atendem o prédio"],
+    ["areascomuns", "Iluminação das áreas comuns", (State.config.areasComuns || []).length ? `${State.config.areasComuns.filter(a => a.status === "funcionando").length} de ${State.config.areasComuns.length} áreas com iluminação ok` : "Registre as áreas comuns e o estado da iluminação"],
+    ["elevadores", "Elevadores", (State.config.elevadores || []).length ? `${State.config.elevadores.filter(e => (e.status || "operando") === "operando").length} de ${State.config.elevadores.length} em operação` : "Sociais e de serviço, por torre, com manutenção"],
   ];
   root.append(el("div", { class: "home-grid" }, cards.map(([id, titulo, sub]) =>
     el("button", { class: "home-card" + (done[id] ? " done" : ""), onclick: () => { location.hash = "#/admin/" + id; } },
@@ -430,6 +468,258 @@ function viewAmbientes(root) {
     }, "Salvar ambientes")));
 }
 
+/* ---------------- Prédio e serviços: prestadores ---------------- */
+function viewPrestadores(root) {
+  root.append(pageHead("Prédio e serviços", "Prestadores de serviço",
+    "As equipes que cuidam do prédio no dia a dia (fixas, com grade semanal) e as que vêm de vez em quando (esporádicas). A portaria consulta esta lista para saber quem entra e em que horário."));
+
+  const lista = State.config.prestadores;
+  const listWrap = el("div", {});
+
+  const redraw = () => {
+    listWrap.innerHTML = "";
+    lista.forEach((p, i) => {
+      const fn = field("Empresa / prestador", p.nome, { placeholder: "Ex.: Verde Vivo Jardinagem" });
+      const fs = field("Serviço prestado", p.servico, { placeholder: "Ex.: Jardinagem" });
+      const ft = field("Tipo", p.tipo || "fixo", { type: "select", options: [{ value: "fixo", nome: "Fixo (vem toda semana)" }, { value: "esporadico", nome: "Esporádico (sob demanda)" }] });
+      const ftel = field("Telefone", p.telefone || "");
+      const fobs = field("Observações", p.obs || "", { placeholder: "Ex.: entra pela portaria de serviço" });
+      fn.input.addEventListener("input", () => { p.nome = fn.input.value; });
+      fs.input.addEventListener("input", () => { p.servico = fs.input.value; });
+      ftel.input.addEventListener("input", () => { p.telefone = ftel.input.value; });
+      fobs.input.addEventListener("input", () => { p.obs = fobs.input.value; });
+      ft.input.addEventListener("change", () => { p.tipo = ft.input.value; redraw(); });
+
+      const gradeWrap = el("div", {});
+      if ((p.tipo || "fixo") === "fixo") {
+        p.grade = p.grade || [];
+        const redrawGrade = () => {
+          gradeWrap.innerHTML = "";
+          gradeWrap.append(el("p", { class: "small muted", style: "margin:10px 0 4px" }, "Grade semanal — em quais dias e horários esta equipe trabalha no condomínio:"));
+          p.grade.forEach((g, j) => {
+            const chips = el("div", { class: "chips" });
+            DIAS_SEMANA.forEach((dia, di) => {
+              const on = (g.dias || []).includes(di);
+              chips.append(el("button", {
+                class: "chip" + (on ? " on" : ""), onclick: (e) => {
+                  e.preventDefault(); g.dias = g.dias || [];
+                  const ix = g.dias.indexOf(di);
+                  if (ix >= 0) g.dias.splice(ix, 1); else { g.dias.push(di); g.dias.sort(); }
+                  e.target.classList.toggle("on");
+                }
+              }, dia));
+            });
+            const fdas = el("input", { type: "time", value: g.das || "" });
+            const fate = el("input", { type: "time", value: g.ate || "" });
+            fdas.addEventListener("change", () => { g.das = fdas.value; });
+            fate.addEventListener("change", () => { g.ate = fate.value; });
+            gradeWrap.append(el("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px" },
+              chips,
+              el("span", { class: "small muted" }, "das"), fdas,
+              el("span", { class: "small muted" }, "às"), fate,
+              el("button", { class: "btn btn-sm btn-danger", onclick: () => { p.grade.splice(j, 1); redrawGrade(); } }, "×")));
+          });
+          gradeWrap.append(el("button", { class: "btn btn-sm btn-ghost", style: "margin-top:8px", onclick: () => { p.grade.push({ dias: [], das: "", ate: "" }); redrawGrade(); } }, "+ Adicionar horário"));
+        };
+        redrawGrade();
+      }
+
+      listWrap.append(el("div", { class: "regra-item" },
+        el("div", { class: "item-head" },
+          el("strong", { class: "small" }, p.nome || "Novo prestador",
+            p.tipo === "esporadico" ? el("span", { class: "pill pill-muted", style: "margin-left:8px" }, "Esporádico") : el("span", { class: "pill pill-accent", style: "margin-left:8px" }, "Fixo")),
+          el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
+        el("div", { class: "grid-2" }, fn.wrap, fs.wrap),
+        el("div", { class: "grid-3", style: "margin-top:8px" }, ft.wrap, ftel.wrap, fobs.wrap),
+        gradeWrap));
+    });
+    if (!lista.length) listWrap.append(el("p", { class: "small muted" }, "Nenhum prestador cadastrado ainda."));
+  };
+  redraw();
+
+  root.append(el("div", { class: "card" }, listWrap,
+    el("div", { class: "modal-actions", style: "justify-content:space-between" },
+      el("button", { class: "btn", onclick: () => { lista.push({ id: uid("pv"), nome: "", servico: "", tipo: "fixo", telefone: "", grade: [], obs: "" }); redraw(); } }, "+ Adicionar prestador"),
+      el("button", {
+        class: "btn btn-accent", onclick: async () => {
+          await Store.saveConfig(); State.dirty = false; toast("Prestadores salvos!"); renderRail("prestadores");
+        }
+      }, "Salvar prestadores"))));
+}
+
+/* ---------------- Prédio e serviços: concessionárias ---------------- */
+function viewConcessionarias(root) {
+  root.append(pageHead("Prédio e serviços", "Concessionárias",
+    "As operadoras de internet e TV por assinatura que atendem o condomínio. Útil para orientar moradores novos e para saber quem chamar quando algo cai."));
+
+  const lista = State.config.concessionarias;
+  const tipos = [
+    { value: "internet", nome: "Internet" }, { value: "tv", nome: "TV por assinatura" },
+    { value: "internet_tv", nome: "Internet + TV" }, { value: "outro", nome: "Outro serviço" },
+  ];
+  const listWrap = el("div", {});
+  const redraw = () => {
+    listWrap.innerHTML = "";
+    lista.forEach((c, i) => {
+      const fn = field("Operadora", c.nome, { placeholder: "Ex.: FibraNet" });
+      const ft = field("Serviço", c.tipo || "internet", { type: "select", options: tipos });
+      const ftel = field("Telefone / contato", c.telefone || "");
+      const fobs = field("Observações", c.obs || "", { placeholder: "Ex.: fibra até o DG de cada torre" });
+      fn.input.addEventListener("input", () => { c.nome = fn.input.value; });
+      ft.input.addEventListener("change", () => { c.tipo = ft.input.value; });
+      ftel.input.addEventListener("input", () => { c.telefone = ftel.input.value; });
+      fobs.input.addEventListener("input", () => { c.obs = fobs.input.value; });
+      listWrap.append(el("div", { class: "regra-item" },
+        el("div", { class: "item-head" },
+          el("strong", { class: "small" }, c.nome || "Nova operadora"),
+          el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
+        el("div", { class: "grid-2" }, fn.wrap, ft.wrap),
+        el("div", { class: "grid-2", style: "margin-top:8px" }, ftel.wrap, fobs.wrap)));
+    });
+    if (!lista.length) listWrap.append(el("p", { class: "small muted" }, "Nenhuma concessionária cadastrada ainda."));
+  };
+  redraw();
+
+  root.append(el("div", { class: "card" }, listWrap,
+    el("div", { class: "modal-actions", style: "justify-content:space-between" },
+      el("button", { class: "btn", onclick: () => { lista.push({ id: uid("cs"), nome: "", tipo: "internet", telefone: "", obs: "" }); redraw(); } }, "+ Adicionar concessionária"),
+      el("button", {
+        class: "btn btn-accent", onclick: async () => {
+          await Store.saveConfig(); State.dirty = false; toast("Concessionárias salvas!"); renderRail("concessionarias");
+        }
+      }, "Salvar concessionárias"))));
+}
+
+/* ---------------- Prédio e serviços: áreas comuns (iluminação) ---------------- */
+function viewAreasComuns(root) {
+  root.append(pageHead("Prédio e serviços", "Iluminação das áreas comuns",
+    "Registre cada área comum e como está a iluminação dela. Ao fazer a ronda, atualize o status e marque a verificação — o painel inicial avisa quando algo está com falha."));
+
+  const lista = State.config.areasComuns;
+  const listWrap = el("div", {});
+  const redraw = () => {
+    listWrap.innerHTML = "";
+    lista.forEach((a, i) => {
+      const fn = field("Área comum", a.nome, { placeholder: "Ex.: Hall social — Torre Ipê" });
+      const fobs = field("Observações", a.obs || "", { placeholder: "Ex.: duas luminárias queimadas" });
+      fn.input.addEventListener("input", () => { a.nome = fn.input.value; });
+      fobs.input.addEventListener("input", () => { a.obs = fobs.input.value; });
+
+      const statusChips = el("div", { class: "chips" });
+      for (const [k, info] of Object.entries(ILUM_INFO)) {
+        statusChips.append(el("button", {
+          class: "chip" + ((a.status || "funcionando") === k ? " on" : ""),
+          onclick: (e) => { e.preventDefault(); a.status = k; redraw(); },
+        }, el("span", { style: `display:inline-block;width:9px;height:9px;border-radius:50%;background:${info.cor};margin-right:6px` }), info.rotulo));
+      }
+
+      listWrap.append(el("div", { class: "regra-item" },
+        el("div", { class: "item-head" },
+          el("strong", { class: "small" }, a.nome || "Nova área"),
+          el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
+        el("div", { class: "grid-2" }, fn.wrap, fobs.wrap),
+        el("div", { style: "display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px" },
+          statusChips,
+          el("span", { class: "small muted" }, "Última verificação: " + fmtDate(a.verificadoEm)),
+          el("button", { class: "btn btn-sm", onclick: () => { a.verificadoEm = todayISO(); redraw(); } }, "Verifiquei hoje"))));
+    });
+    if (!lista.length) listWrap.append(el("p", { class: "small muted" }, "Nenhuma área comum cadastrada ainda."));
+  };
+  redraw();
+
+  root.append(el("div", { class: "card" }, listWrap,
+    el("div", { class: "modal-actions", style: "justify-content:space-between" },
+      el("button", { class: "btn", onclick: () => { lista.push({ id: uid("ac"), nome: "", status: "funcionando", verificadoEm: todayISO(), obs: "" }); redraw(); } }, "+ Adicionar área comum"),
+      el("button", {
+        class: "btn btn-accent", onclick: async () => {
+          await Store.saveConfig(); State.dirty = false; toast("Áreas comuns salvas!"); renderRail("areascomuns");
+        }
+      }, "Salvar áreas comuns"))));
+}
+
+/* ---------------- Prédio e serviços: elevadores ---------------- */
+function viewElevadores(root) {
+  root.append(pageHead("Prédio e serviços", "Elevadores",
+    "Cadastre os elevadores de cada torre — sociais e de serviço, com nome — e acompanhe o funcionamento e o histórico de manutenção de cada um."));
+
+  const lista = State.config.elevadores;
+  const torres = State.config.torres;
+  if (!torres.length) {
+    root.append(el("div", { class: "banner banner-warn" },
+      "Cadastre as torres primeiro, para poder dizer de qual torre é cada elevador. ",
+      el("button", { class: "btn btn-sm", style: "margin-left:6px", onclick: () => { location.hash = "#/admin/estrutura"; } }, "Cadastrar torres")));
+    return;
+  }
+
+  const listWrap = el("div", {});
+  const redraw = () => {
+    listWrap.innerHTML = "";
+    lista.forEach((ev, i) => {
+      const ftorre = field("Torre", ev.torreId || "", { type: "select", options: [{ value: "", nome: "Torre…" }].concat(torres.map(t => ({ value: t.id, nome: t.nome || t.id }))) });
+      const fn = field("Nome do elevador", ev.nome, { placeholder: "Ex.: Social 1" });
+      const ft = field("Tipo", ev.tipo || "social", { type: "select", options: [{ value: "social", nome: "Social" }, { value: "servico", nome: "Serviço" }] });
+      const fum = field("Última manutenção", ev.ultimaManut || "", { type: "date" });
+      const fpm = field("Próxima manutenção prevista", ev.proximaManut || "", { type: "date" });
+      ftorre.input.addEventListener("change", () => { ev.torreId = ftorre.input.value; });
+      fn.input.addEventListener("input", () => { ev.nome = fn.input.value; });
+      ft.input.addEventListener("change", () => { ev.tipo = ft.input.value; });
+      fum.input.addEventListener("change", () => { ev.ultimaManut = fum.input.value; });
+      fpm.input.addEventListener("change", () => { ev.proximaManut = fpm.input.value; });
+
+      const statusChips = el("div", { class: "chips" });
+      for (const [k, info] of Object.entries(ELEV_STATUS)) {
+        statusChips.append(el("button", {
+          class: "chip" + ((ev.status || "operando") === k ? " on" : ""),
+          onclick: (e) => { e.preventDefault(); ev.status = k; redraw(); },
+        }, el("span", { style: `display:inline-block;width:9px;height:9px;border-radius:50%;background:${info.cor};margin-right:6px` }), info.rotulo));
+      }
+
+      const histWrap = el("div", {});
+      const redrawHist = () => {
+        histWrap.innerHTML = "";
+        (ev.historico || []).forEach((h, j) => {
+          const fd = el("input", { type: "date", value: h.data || "" });
+          const fx = el("input", { placeholder: "O que foi feito", value: h.descricao || "", style: "flex:1;min-width:180px" });
+          fd.addEventListener("change", () => { h.data = fd.value; });
+          fx.addEventListener("input", () => { h.descricao = fx.value; });
+          histWrap.append(el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px" },
+            fd, fx,
+            el("button", { class: "btn btn-sm btn-danger", onclick: () => { ev.historico.splice(j, 1); redrawHist(); } }, "×")));
+        });
+        histWrap.append(el("button", {
+          class: "btn btn-sm btn-ghost", style: "margin-top:8px",
+          onclick: () => { ev.historico = ev.historico || []; ev.historico.push({ data: todayISO(), descricao: "" }); redrawHist(); }
+        }, "+ Registrar manutenção"));
+      };
+      redrawHist();
+
+      const torreNome = (torres.find(t => t.id === ev.torreId) || {}).nome || ev.torreId || "sem torre";
+      listWrap.append(el("div", { class: "regra-item" },
+        el("div", { class: "item-head" },
+          el("strong", { class: "small" }, `${ev.nome || "Novo elevador"} · ${torreNome}`,
+            el("span", { class: "pill pill-muted", style: "margin-left:8px" }, ELEV_TIPO[ev.tipo] || "Social")),
+          el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
+        el("div", { class: "grid-3" }, ftorre.wrap, fn.wrap, ft.wrap),
+        el("div", { style: "margin-top:10px" },
+          el("p", { class: "small muted", style: "margin-bottom:4px" }, "Funcionamento:"), statusChips),
+        el("div", { class: "grid-2", style: "margin-top:10px" }, fum.wrap, fpm.wrap),
+        el("p", { class: "small muted", style: "margin:10px 0 0" }, "Histórico de manutenção:"),
+        histWrap));
+    });
+    if (!lista.length) listWrap.append(el("p", { class: "small muted" }, "Nenhum elevador cadastrado ainda."));
+  };
+  redraw();
+
+  root.append(el("div", { class: "card" }, listWrap,
+    el("div", { class: "modal-actions", style: "justify-content:space-between" },
+      el("button", { class: "btn", onclick: () => { lista.push({ id: uid("el"), torreId: torres[0].id, nome: "", tipo: "social", status: "operando", ultimaManut: "", proximaManut: "", historico: [] }); redraw(); } }, "+ Adicionar elevador"),
+      el("button", {
+        class: "btn btn-accent", onclick: async () => {
+          await Store.saveConfig(); State.dirty = false; toast("Elevadores salvos!"); renderRail("elevadores");
+        }
+      }, "Salvar elevadores"))));
+}
+
 /* ---------------- 5. Stacking plan + moradores ---------------- */
 function stackingLegend() {
   const item = (sw, label, isHammer) => el("span", { class: "legend-item" },
@@ -571,16 +861,39 @@ function openUnitModal(unitId) {
     return el("div", { class: "grid-3" }, fn.wrap, ft.wrap, fe.wrap);
   }
 
-  function prazoFields() {
-    d.prazoLocacao = d.prazoLocacao || { valor: "", unidade: "meses", dias: "" };
-    const p = d.prazoLocacao;
-    const fv = field("Prazo da locação (opcional)", p.valor, { type: "number", min: 0 });
-    const fu = field("Unidade", p.unidade, { type: "select", options: [{ value: "meses", nome: "Meses" }, { value: "anos", nome: "Anos" }] });
-    const fd = field("Dias adicionais (opcional)", p.dias, { type: "number", min: 0, hint: "Use se o contrato tiver dias avulsos além de meses/anos." });
-    fv.input.addEventListener("input", () => { p.valor = fv.input.value === "" ? "" : +fv.input.value; });
-    fu.input.addEventListener("change", () => { p.unidade = fu.input.value; });
-    fd.input.addEventListener("input", () => { p.dias = fd.input.value === "" ? "" : +fd.input.value; });
-    return el("div", { class: "grid-3" }, fv.wrap, fu.wrap, fd.wrap);
+  function contratoFields() {
+    d.contrato = d.contrato || { inicio: "", fim: "" };
+    const fi = field("Início do contrato", d.contrato.inicio, { type: "date" });
+    const ff = field("Término do contrato", d.contrato.fim, { type: "date" });
+    fi.input.addEventListener("change", () => { d.contrato.inicio = fi.input.value; });
+    ff.input.addEventListener("change", () => { d.contrato.fim = ff.input.value; });
+    return el("div", { class: "grid-2" }, fi.wrap, ff.wrap);
+  }
+
+  function moradoresFixosEditor() {
+    return el("div", {},
+      el("p", { class: "hint small muted", style: "margin-bottom:6px" }, "Quem mora na unidade de forma permanente (aparece para a portaria)."),
+      tagEditor(() => (d.moradoresFixos = d.moradoresFixos || []), l => { d.moradoresFixos = l; }, "Nome do morador"));
+  }
+
+  function prumadasBlock() {
+    d.prumadasAtualizadas = d.prumadasAtualizadas || {};
+    const wrap = el("div", { style: "margin-top:16px" },
+      el("h3", { class: "small", style: "margin-bottom:2px" }, "Prumadas atualizadas"),
+      el("p", { class: "hint small muted", style: "margin-bottom:4px" }, "Marque as prumadas que esta unidade já modernizou — e quando, se souber."));
+    for (const pr of State.config.prumadas) {
+      const reg = d.prumadasAtualizadas[pr.id];
+      const chk = el("input", { type: "checkbox", checked: !!reg });
+      const fd = el("input", { type: "date", value: (reg && reg.data) || "", disabled: !reg });
+      chk.addEventListener("change", () => {
+        if (chk.checked) { d.prumadasAtualizadas[pr.id] = d.prumadasAtualizadas[pr.id] || {}; fd.disabled = false; }
+        else { delete d.prumadasAtualizadas[pr.id]; fd.value = ""; fd.disabled = true; }
+      });
+      fd.addEventListener("change", () => { if (d.prumadasAtualizadas[pr.id]) d.prumadasAtualizadas[pr.id].data = fd.value; });
+      wrap.append(el("label", { class: "check", style: "margin-top:6px;gap:10px;flex-wrap:wrap" },
+        chk, el("span", { style: "flex:1;min-width:150px" }, pr.nome), fd));
+    }
+    return wrap;
   }
 
   function redrawForm() {
@@ -597,7 +910,9 @@ function openUnitModal(unitId) {
             d.proprietario = d.morador; d.morador = {}; d.status = "inquilino"; d._propInformado = true; redrawForm();
           }
         }, "+ Adicionar locatário/inquilino"),
-        el("p", { class: "hint small muted", style: "margin-top:4px" }, "Se a unidade for ocupada por um inquilino futuramente, os dados do proprietário são mantidos e você cadastra o locatário."));
+        el("p", { class: "hint small muted", style: "margin-top:4px" }, "Se a unidade for ocupada por um inquilino futuramente, os dados do proprietário são mantidos e você cadastra o locatário."),
+        el("h3", { class: "small", style: "margin:12px 0 6px" }, "Moradores fixos da unidade"),
+        moradoresFixosEditor());
     } else if (d.status === "inquilino") {
       d.morador = d.morador || {};
       formWrap.append(
@@ -613,7 +928,11 @@ function openUnitModal(unitId) {
           onclick: () => { d._propInformado = true; redrawForm(); }
         }, "Informar proprietário"));
       }
-      formWrap.append(el("h3", { class: "small", style: "margin:12px 0 6px" }, "Locação"), prazoFields());
+      formWrap.append(
+        el("h3", { class: "small", style: "margin:12px 0 6px" }, "Contrato de locação"),
+        contratoFields(),
+        el("h3", { class: "small", style: "margin:12px 0 6px" }, "Moradores fixos da unidade"),
+        moradoresFixosEditor());
     } else if (d.status === "comercializacao") {
       const fm = field("Situação de comercialização", d.comercializacao || "alugar", {
         type: "select", options: [{ value: "alugar", nome: "Para alugar" }, { value: "vender", nome: "Para vender" }]
@@ -630,6 +949,7 @@ function openUnitModal(unitId) {
     } else {
       formWrap.append(el("p", { class: "small muted" }, "Escolha uma das opções acima para começar."));
     }
+    if (d.status) formWrap.append(prumadasBlock());
   }
   redrawForm();
 
@@ -778,7 +1098,7 @@ function viewIntegracao(root) {
     el("dl", { class: "kv", style: "margin-top:10px" },
       el("dt", {}, "Esquema"), el("dd", { class: "mono" }, SCHEMA_VERSION),
       el("dt", {}, "ID de unidade"), el("dd", { class: "mono" }, "<torre>-<andar*100+final>  (ex.: T1-402)"),
-      el("dt", {}, "Entidades"), el("dd", {}, "condominio · torres · prumadas · regrasAmbientes · unidades (com ocupação) · obras"),
+      el("dt", {}, "Entidades"), el("dd", {}, "condominio · torres · prumadas · regrasAmbientes · prestadores · concessionarias · areasComuns · elevadores · unidades (ocupação, contrato, moradores fixos, prumadas atualizadas) · obras"),
       el("dt", {}, "Armazenamento"), el("dd", {}, State.mode === "db" ? "Banco compartilhado desta página (quem tem acesso vê os mesmos dados)" : "Neste navegador (modo demonstração)"))));
 
   root.append(el("div", { class: "card" },
