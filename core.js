@@ -150,6 +150,10 @@ const Store = {
       State.mode = "db";
       await this._loadFromDb();
       this._subscribe();
+    } else if (await this._probeApi()) {
+      State.mode = "api";
+      await this._loadFromApi();
+      this._pollApi();
     } else {
       State.mode = "local";
       this._loadFromLocal();
@@ -185,6 +189,54 @@ const Store = {
     }, () => {}));
   },
 
+  /* ---- modo "api": servidor local (server.js), banco em data/db.json ---- */
+  _rev: 0,
+  async _probeApi() {
+    if (location.protocol !== "http:" && location.protocol !== "https:") return false;
+    try {
+      const r = await fetch("api/rev", { cache: "no-store" });
+      if (!r.ok) return false;
+      const j = await r.json();
+      return typeof j.rev === "number";
+    } catch (e) { return false; }
+  },
+  async _loadFromApi() {
+    const r = await fetch("api/state", { cache: "no-store" });
+    const j = await r.json();
+    this._rev = j.rev;
+    State.config = j.config;
+    State.units = j.units || {};
+    State.obras = j.obras || {};
+  },
+  _pollApi() {
+    setInterval(async () => {
+      try {
+        const r = await fetch("api/rev", { cache: "no-store" });
+        const j = await r.json();
+        if (j.rev !== this._rev) {
+          await this._loadFromApi();
+          if (!State.config) State.config = defaultConfig();
+          upgradeConfig(State.config);
+          if (this.onRemoteChange) this.onRemoteChange("all");
+        }
+      } catch (e) { /* servidor indisponível no momento: tenta no próximo ciclo */ }
+    }, 8000);
+  },
+  async _apiSend(method, url, body) {
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (typeof j.rev === "number") this._rev = j.rev;
+    } catch (e) {
+      toast("Não foi possível salvar no servidor local — ele está rodando?");
+    }
+  },
+
   _loadFromLocal() {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -205,6 +257,7 @@ const Store = {
   async saveConfig() {
     State.config.schema = SCHEMA_VERSION;
     if (this.db) await this.db.doc("app/config").set(JSON.parse(JSON.stringify(State.config)));
+    else if (State.mode === "api") await this._apiSend("PUT", "api/config", State.config);
     else this._saveLocal();
   },
   async saveUnit(unitId) {
@@ -212,6 +265,9 @@ const Store = {
     if (this.db) {
       if (body) await this.db.doc("units/" + unitId).set(JSON.parse(JSON.stringify(body)));
       else await this.db.doc("units/" + unitId).delete();
+    } else if (State.mode === "api") {
+      if (body) await this._apiSend("PUT", "api/units/" + unitId, body);
+      else await this._apiSend("DELETE", "api/units/" + unitId);
     } else this._saveLocal();
   },
   async saveObra(obraId) {
@@ -219,9 +275,17 @@ const Store = {
     if (this.db) {
       if (body) await this.db.doc("obras/" + obraId).set(JSON.parse(JSON.stringify(body)));
       else await this.db.doc("obras/" + obraId).delete();
+    } else if (State.mode === "api") {
+      if (body) await this._apiSend("PUT", "api/obras/" + obraId, body);
+      else await this._apiSend("DELETE", "api/obras/" + obraId);
     } else this._saveLocal();
   },
   async wipeAll() {
+    if (State.mode === "api" && !this.db) {
+      await this._apiSend("POST", "api/wipe");
+      State.config = defaultConfig(); State.units = {}; State.obras = {};
+      return;
+    }
     if (this.db) {
       const jobs = [this.db.doc("app/config").delete()];
       for (const id of Object.keys(State.units)) jobs.push(this.db.doc("units/" + id).delete());

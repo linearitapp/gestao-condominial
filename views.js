@@ -121,6 +121,7 @@ function updateTopbar() {
   $("#brand-sub").textContent = (c && c.nome) ? c.nome : "Gestão de obras em condomínio";
   const pill = $("#sync-pill");
   if (State.mode === "db") { pill.textContent = "Dados compartilhados"; pill.className = "pill pill-accent"; pill.title = "Salvo no banco do artifact: quem abrir esta página vê os mesmos dados."; }
+  else if (State.mode === "api") { pill.textContent = "Servidor local"; pill.className = "pill pill-accent"; pill.title = "Salvo no servidor desta máquina (data/db.json): todos os navegadores que abrirem este endereço veem os mesmos dados."; }
   else { pill.textContent = "Demonstração local"; pill.className = "pill pill-muted"; pill.title = "Sem banco compartilhado nesta visualização: os dados ficam apenas neste navegador."; }
   const comp = cadastroCompleto();
   $("#btn-informar-obra").hidden = !comp.ok;
@@ -158,9 +159,9 @@ function viewInicio(root) {
           el("p", {}, "Com o mapa completo, você gera um link para o morador comunicar a obra — com cronograma, prestadores e assinatura digital."))),
       el("div", { style: "margin-top:20px;display:flex;gap:10px;flex-wrap:wrap" },
         el("button", { class: "btn btn-accent", onclick: () => { location.hash = "#/admin/condominio"; } }, "Começar pelo condomínio →"),
-        State.mode === "local" ? el("button", {
+        el("button", {
           class: "btn", onclick: async () => { await loadSample(); renderAdmin("inicio"); toast("Condomínio de exemplo carregado — explore à vontade!"); }
-        }, "Ver um exemplo pronto") : null)));
+        }, "Ver um exemplo pronto"))));
     return;
   }
 
@@ -1099,7 +1100,10 @@ function viewIntegracao(root) {
       el("dt", {}, "Esquema"), el("dd", { class: "mono" }, SCHEMA_VERSION),
       el("dt", {}, "ID de unidade"), el("dd", { class: "mono" }, "<torre>-<andar*100+final>  (ex.: T1-402)"),
       el("dt", {}, "Entidades"), el("dd", {}, "condominio · torres · prumadas · regrasAmbientes · prestadores · concessionarias · areasComuns · elevadores · unidades (ocupação, contrato, moradores fixos, prumadas atualizadas) · obras"),
-      el("dt", {}, "Armazenamento"), el("dd", {}, State.mode === "db" ? "Banco compartilhado desta página (quem tem acesso vê os mesmos dados)" : "Neste navegador (modo demonstração)"))));
+      el("dt", {}, "Armazenamento"), el("dd", {},
+        State.mode === "db" ? "Banco compartilhado desta página (quem tem acesso vê os mesmos dados)"
+          : State.mode === "api" ? "Servidor local desta máquina — arquivo data/db.json do projeto"
+            : "Neste navegador (modo demonstração)"))));
 
   root.append(el("div", { class: "card" },
     el("h3", {}, "Exportar uma cópia completa"),
