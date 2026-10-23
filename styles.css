@@ -1,15 +1,17 @@
-/* ============ Axisgrid Obras — design tokens ============ */
+/* ============ domnex — design tokens (ardósia + verde-limão) ============ */
 :root {
-  --bg: #F2F4F3;
+  --bg: #F2F4F5;
   --surface: #FFFFFF;
-  --surface-2: #E9EDEB;
-  --ink: #1C2B33;
-  --muted: #5C6B72;
-  --line: #D7DEDB;
-  --line-strong: #B9C4C0;
-  --accent: #0E6B68;
-  --accent-soft: #E0EEED;
+  --surface-2: #E8EBEE;
+  --ink: #27313D;
+  --muted: #5D6B79;
+  --line: #D8DEE3;
+  --line-strong: #B8C2CC;
+  --accent: #323E4C;
+  --accent-soft: #EDF4D5;
   --accent-ink: #FFFFFF;
+  --lime: #A4D41E;
+  --lime-ink: #27313D;
   --danger: #B4362E;
   --danger-soft: #F6E4E2;
   --warn-soft: #F7EEDC;
@@ -40,16 +42,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #101819;
-    --surface: #182224;
-    --surface-2: #1F2C2E;
-    --ink: #E2EAE8;
-    --muted: #91A3A1;
-    --line: #2B3A3B;
-    --line-strong: #3D5052;
-    --accent: #45B1AA;
-    --accent-soft: #16302F;
-    --accent-ink: #06211F;
+    --bg: #121922;
+    --surface: #1A2330;
+    --surface-2: #232E3C;
+    --ink: #E4E9EE;
+    --muted: #8E9CAB;
+    --line: #2B3645;
+    --line-strong: #415061;
+    --accent: #AFDB33;
+    --accent-soft: #2A331D;
+    --accent-ink: #19222E;
+    --lime: #AFDB33;
+    --lime-ink: #19222E;
     --danger: #E07068;
     --danger-soft: #3A2321;
     --warn-soft: #35301E;
@@ -66,16 +70,18 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #101819;
-  --surface: #182224;
-  --surface-2: #1F2C2E;
-  --ink: #E2EAE8;
-  --muted: #91A3A1;
-  --line: #2B3A3B;
-  --line-strong: #3D5052;
-  --accent: #45B1AA;
-  --accent-soft: #16302F;
-  --accent-ink: #06211F;
+  --bg: #121922;
+  --surface: #1A2330;
+  --surface-2: #232E3C;
+  --ink: #E4E9EE;
+  --muted: #8E9CAB;
+  --line: #2B3645;
+  --line-strong: #415061;
+  --accent: #AFDB33;
+  --accent-soft: #2A331D;
+  --accent-ink: #19222E;
+  --lime: #AFDB33;
+  --lime-ink: #19222E;
   --danger: #E07068;
   --danger-soft: #3A2321;
   --warn-soft: #35301E;
@@ -125,10 +131,10 @@ input, select, textarea { font: inherit; color: var(--ink); }
   position: sticky; top: 0; z-index: 30;
 }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.brand-mark { width: 30px; height: 30px; flex: none; }
+.brand-mark { width: 46px; height: 25px; flex: none; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.brand-text strong { font-family: var(--font-display); font-size: 16px; letter-spacing: .01em; }
-.brand-text strong span { color: var(--accent); }
+.brand-text strong { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.brand-x { color: var(--lime); }
 .brand-text small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 
@@ -402,7 +408,7 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 }
 .gantt-bar.ruido { background: var(--ob-meio); }
 .gantt-bar.folga { background: transparent; border: 1.5px dashed var(--ob-meio); color: var(--ob-meio); }
-.gantt-bar.total { background: var(--accent); }
+.gantt-bar.total { background: var(--accent); color: var(--accent-ink); }
 
 /* ============ documento (revisão + impressão) ============ */
 .doc-shell { flex: 1; padding: 26px 16px 80px; display: flex; justify-content: center; }
@@ -455,7 +461,7 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 
 /* progresso de preenchimento */
 .progress-line { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-.progress-line > div { height: 100%; background: var(--accent); border-radius: 999px; }
+.progress-line > div { height: 100%; background: var(--lime); border-radius: 999px; }
 
 /* ============ responsivo ============ */
 @media (max-width: 860px) {

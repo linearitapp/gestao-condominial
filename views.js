@@ -118,7 +118,7 @@ function renderAdmin(tab) {
 
 function updateTopbar() {
   const c = State.config && State.config.condominio;
-  $("#brand-sub").textContent = (c && c.nome) ? c.nome : "Gestão de obras em condomínio";
+  $("#brand-sub").textContent = (c && c.nome) ? c.nome : "Gestão predial completa";
   const pill = $("#sync-pill");
   if (State.mode === "db") { pill.textContent = "Dados compartilhados"; pill.className = "pill pill-accent"; pill.title = "Salvo no banco do artifact: quem abrir esta página vê os mesmos dados."; }
   else if (State.mode === "api") { pill.textContent = "Servidor local"; pill.className = "pill pill-accent"; pill.title = "Salvo no servidor desta máquina (data/db.json): todos os navegadores que abrirem este endereço veem os mesmos dados."; }
@@ -1114,7 +1114,7 @@ function viewIntegracao(root) {
           const json = JSON.stringify(AxisgridAdapter.exportSnapshot(), null, 2);
           const dls = await (window.claude && window.claude.use ? window.claude.use("downloads") : Promise.resolve(null));
           if (dls) {
-            try { await dls.save({ filename: "gestao-condominial-dados.json", data: json }); toast("Cópia dos dados salva!"); }
+            try { await dls.save({ filename: "domnex-dados.json", data: json }); toast("Cópia dos dados salva!"); }
             catch (e) { if (e && e.code !== "declined") toast("Não foi possível salvar o arquivo aqui — use “Copiar JSON”."); }
           } else {
             try { await navigator.clipboard.writeText(json); toast("Download indisponível nesta visualização — JSON copiado para a área de transferência."); }

@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestão Condominial</title>
+<title>domnex</title>
+<link rel="icon" type="image/svg+xml" href="assets/domnex-mark.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -14,15 +15,22 @@
 <div id="app" class="app">
   <header class="topbar" id="topbar">
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="3" width="8" height="8" rx="1.5" fill="var(--accent)"/>
-        <rect x="13" y="3" width="8" height="8" rx="1.5" fill="var(--accent)" opacity=".45"/>
-        <rect x="3" y="13" width="8" height="8" rx="1.5" fill="var(--accent)" opacity=".45"/>
-        <rect x="13" y="13" width="8" height="8" rx="1.5" fill="var(--accent)" opacity=".2"/>
+      <svg class="brand-mark" viewBox="0 0 128 64" aria-hidden="true" fill="none">
+        <g stroke="var(--ink)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 56h112"/>
+          <path d="M8 56 Q64 -14 120 56"/>
+          <path d="M64 22v34"/>
+          <path d="M8 56 64 22M120 56 64 22"/>
+          <path d="M36 30 64 56M92 30 64 56"/>
+        </g>
+        <g fill="var(--lime)">
+          <circle cx="8" cy="56" r="6"/><circle cx="120" cy="56" r="6"/>
+          <circle cx="64" cy="22" r="6"/><circle cx="36" cy="30" r="6"/><circle cx="92" cy="30" r="6"/>
+        </g>
       </svg>
       <div class="brand-text">
-        <strong>Gestão <span>Condominial</span></strong>
-        <small id="brand-sub">Obras e moradores num só lugar</small>
+        <strong>domne<span class="brand-x">x</span></strong>
+        <small id="brand-sub">Gestão predial completa</small>
       </div>
     </div>
     <div class="topbar-right">

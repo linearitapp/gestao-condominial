@@ -406,7 +406,7 @@ const AxisgridAdapter = {
     return {
       schema: SCHEMA_VERSION,
       exportadoEm: new Date().toISOString(),
-      origem: "gestao-condominial-prototipo",
+      origem: "domnex-prototipo",
       condominio: State.config.condominio,
       torres: State.config.torres,
       prumadas: State.config.prumadas,

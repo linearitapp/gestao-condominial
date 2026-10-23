@@ -504,7 +504,10 @@ function buildDocumento(obra, obraId, opts) {
       el("p", { class: "small muted" }, c.nome || "Condomínio", c.endereco ? ` · ${c.endereco}, ${c.cidade || ""}${c.uf ? "/" + c.uf : ""}` : "")),
     el("div", { style: "text-align:right" },
       el("div", { class: "mono", style: "font-weight:600" }, obra.protocolo || "PRÉVIA — não submetida"),
-      el("div", { class: "small muted" }, "Emitido em " + fmtDate(todayISO())))));
+      el("div", { class: "small muted" }, "Emitido em " + fmtDate(todayISO())),
+      el("div", { class: "small muted", style: "margin-top:2px;font-family:var(--font-display);font-weight:700" },
+        "domne", el("span", { style: "color:var(--lime)" }, "x"),
+        el("span", { style: "font-weight:400" }, " · gestão predial")))));
 
   doc.append(el("section", { class: "doc-sec" }, el("h3", {}, "1 · Identificação"),
     kv([

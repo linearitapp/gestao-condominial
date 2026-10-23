@@ -1,6 +1,8 @@
-# Gestão Condominial
+# domnex
 
-Aplicação web para condomínios registrarem as obras dos apartamentos: stacking plan
+![domnex](assets/domnex-logo.webp)
+
+**domnex** — gestão predial completa para condomínios: stacking plan
 com o status de cada unidade (proprietário, inquilino, vago, comercialização, disputa),
 cadastro de moradores e fluxo completo de comunicação de obra — abrangência, escopo,
 cronograma de ruído, prestadores de serviço e assinatura digital com token.
