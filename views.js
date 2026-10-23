@@ -68,7 +68,9 @@ function renderRail(active) {
       class: (active === t.id ? "active " : "") + (doneMap[t.id] ? "done" : ""),
       onclick: () => { location.hash = "#/admin/" + t.id; },
     }, el("span", { html: tabIcon(t.id) }), t.nome,
-      doneMap[t.id] ? el("span", { class: "rail-check", title: "Etapa concluída" }, "✓") : null));
+      // o ✓ marca apenas as etapas de cadastro — nas telas de operação ele seria só ruído
+      doneMap[t.id] && ["condominio", "estrutura", "prumadas", "ambientes", "stacking"].includes(t.id)
+        ? el("span", { class: "rail-check", title: "Etapa concluída" }, "✓") : null));
   }
 }
 
@@ -136,10 +138,10 @@ function viewInicio(root) {
   const done = adminTabDone();
 
   root.append(el("div", { class: "hello" },
-    el("h1", {}, c.nome ? `Olá! Este é o painel do ${c.nome}` : "Boas-vindas!"),
+    el("h1", {}, c.nome || "Boas-vindas!"),
     el("p", {}, temTorres
-      ? "Acompanhe o condomínio num só lugar: quem mora em cada unidade, o que está vago e quais obras estão acontecendo."
-      : "Este é o painel de gestão de obras do seu condomínio. Em três passos simples, você monta o mapa do prédio e passa a receber as comunicações de obra dos moradores.")));
+      ? "Unidades, moradores, serviços e obras — tudo num só lugar."
+      : "Em três passos simples, você monta o mapa do prédio e passa a receber as comunicações de obra dos moradores.")));
 
   if (!temTorres) {
     root.append(el("div", { class: "welcome-hero" },
@@ -190,22 +192,25 @@ function viewInicio(root) {
     el("div", { class: "stat-tile" }, el("div", { class: "num" }, `${comp.feitos}/${comp.total}`), el("div", { class: "lbl" }, "unidades com morador/status preenchido")),
     el("div", { class: "stat-tile" }, el("div", { class: "num" }, String(obrasAtivas)), el("div", { class: "lbl" }, obrasAtivas === 1 ? "obra em andamento" : "obras em andamento"))));
 
+  const areasFalha = (State.config.areasComuns || []).filter(a => a.status && a.status !== "funcionando").length;
+  const elevAtencao = (State.config.elevadores || []).filter(e => e.status && e.status !== "operando").length;
   const cards = [
-    ["condominio", "Dados do condomínio", done.condominio ? "Preenchidos — clique para revisar" : "Nome, endereço e contatos da administração"],
-    ["estrutura", "Torres e andares", done.estrutura ? "Estrutura montada — clique para ajustar" : "Quantas torres, andares e apartamentos"],
-    ["prumadas", "Prumadas verticais", "Hidráulica, esgoto, elétrica, dados e outras"],
-    ["ambientes", "Ambientes das unidades", done.ambientes ? "Cadastrados — clique para revisar" : "Quais cômodos existem em cada tipo de apartamento"],
-    ["stacking", "Stacking plan", comp.ok ? "Mapa completo! Clique para ver e atualizar" : `Faltam ${comp.total - comp.feitos} unidades para completar o mapa`],
-    ["obras", "Obras", comp.ok ? "Gere links de obra e acompanhe cada reforma" : "Libera quando o mapa estiver completo"],
-    ["prestadores", "Prestadores de serviço", (State.config.prestadores || []).length ? `${State.config.prestadores.length} equipe(s) cadastrada(s), com grade semanal` : "Equipes fixas e esporádicas que cuidam do prédio"],
-    ["concessionarias", "Concessionárias", (State.config.concessionarias || []).length ? `${State.config.concessionarias.length} operadora(s) de internet e TV` : "Operadoras de internet e TV que atendem o prédio"],
-    ["areascomuns", "Iluminação das áreas comuns", (State.config.areasComuns || []).length ? `${State.config.areasComuns.filter(a => a.status === "funcionando").length} de ${State.config.areasComuns.length} áreas com iluminação ok` : "Registre as áreas comuns e o estado da iluminação"],
-    ["elevadores", "Elevadores", (State.config.elevadores || []).length ? `${State.config.elevadores.filter(e => (e.status || "operando") === "operando").length} de ${State.config.elevadores.length} em operação` : "Sociais e de serviço, por torre, com manutenção"],
+    ["condominio", "Condomínio"],
+    ["estrutura", "Torres e andares"],
+    ["prumadas", "Prumadas"],
+    ["ambientes", "Ambientes"],
+    ["stacking", "Stacking plan", comp.ok ? null : `faltam ${comp.total - comp.feitos}`],
+    ["obras", "Obras", obrasAtivas ? `${obrasAtivas} em andamento` : null],
+    ["prestadores", "Prestadores"],
+    ["concessionarias", "Concessionárias"],
+    ["areascomuns", "Áreas comuns", areasFalha ? `${areasFalha} com falha` : null],
+    ["elevadores", "Elevadores", elevAtencao ? `${elevAtencao} em atenção` : null],
   ];
-  root.append(el("div", { class: "home-grid" }, cards.map(([id, titulo, sub]) =>
+  root.append(el("div", { class: "home-grid" }, cards.map(([id, titulo, badge]) =>
     el("button", { class: "home-card" + (done[id] ? " done" : ""), onclick: () => { location.hash = "#/admin/" + id; } },
       el("span", { class: "hicon", html: tabIcon(id) }),
-      el("span", { class: "htext" }, el("strong", {}, titulo), el("span", {}, sub)),
+      el("span", { class: "htext" }, el("strong", {}, titulo)),
+      badge ? el("span", { class: "pill pill-warn" }, badge) : null,
       el("span", { class: "harrow" }, "›")))));
 
   if (comp.ok) {
@@ -219,7 +224,7 @@ function viewInicio(root) {
 function viewCondominio(root) {
   const c = State.config.condominio;
   root.append(pageHead("Passo 1 de 4", "Dados do condomínio",
-    "Conte quem é o condomínio: nome, endereço e os contatos da administração. Esses dados aparecem no topo de todos os documentos de obra."));
+    "Nome, endereço e contatos da administração — aparecem nos documentos de obra."));
 
   const f = {};
   const defs = [
@@ -246,7 +251,7 @@ function viewCondominio(root) {
 /* ---------------- 2. Torres e andares ---------------- */
 function viewEstrutura(root) {
   root.append(pageHead("Passo 2 de 4", "Torres e andares",
-    "Diga quantas torres o condomínio tem e, em cada uma, quantos andares e apartamentos por andar. Se algum andar for diferente dos demais — uma cobertura com 2 unidades, por exemplo — adicione-o como andar fora da tipologia comum."));
+    "Quantas torres, andares e apartamentos por andar. Andares diferentes (ex.: cobertura) entram como exceção."));
 
   const torres = State.config.torres;
   const listWrap = el("div", { class: "stack" });
@@ -322,7 +327,7 @@ function viewEstrutura(root) {
 /* ---------------- 3. Prumadas ---------------- */
 function viewPrumadas(root) {
   root.append(pageHead("Passo 3 de 4", "Prumadas verticais",
-    "Prumadas são as tubulações e cabos que sobem pelo prédio — água, esgoto, energia, internet. As mais comuns já vêm preenchidas; ajuste os nomes ou adicione outras que existam no seu edifício (gás, por exemplo)."));
+    "As tubulações e cabos que sobem pelo prédio. Ajuste as sugeridas ou adicione outras."));
 
   const prumadas = State.config.prumadas;
   const tipos = [
@@ -384,7 +389,7 @@ function tagEditor(getList, setList, placeholder) {
 
 function viewAmbientes(root) {
   root.append(pageHead("Passo 4 de 4", "Ambientes das unidades",
-    "Liste os cômodos de cada tipo de apartamento — o morador vai escolher entre eles ao comunicar uma obra. Dá para ter uma lista para todos, listas por final de unidade (ex.: todo final 2 e 4) e exceções, como uma cobertura duplex ou a unidade jardim do térreo."));
+    "Os cômodos de cada tipo de apartamento — o morador escolhe entre eles ao comunicar uma obra."));
 
   const amb = State.config.ambientes;
   const maxFinal = Math.max(1, ...State.config.torres.map(t => Math.max(t.unidadesPorAndar || 0, ...(t.andaresAtipicos || []).map(a => a.unidades || 0))));
@@ -472,7 +477,7 @@ function viewAmbientes(root) {
 /* ---------------- Prédio e serviços: prestadores ---------------- */
 function viewPrestadores(root) {
   root.append(pageHead("Prédio e serviços", "Prestadores de serviço",
-    "As equipes que cuidam do prédio no dia a dia (fixas, com grade semanal) e as que vêm de vez em quando (esporádicas). A portaria consulta esta lista para saber quem entra e em que horário."));
+    "Quem cuida do prédio, com os dias e horários de cada equipe."));
 
   const lista = State.config.prestadores;
   const listWrap = el("div", {});
@@ -551,7 +556,7 @@ function viewPrestadores(root) {
 /* ---------------- Prédio e serviços: concessionárias ---------------- */
 function viewConcessionarias(root) {
   root.append(pageHead("Prédio e serviços", "Concessionárias",
-    "As operadoras de internet e TV por assinatura que atendem o condomínio. Útil para orientar moradores novos e para saber quem chamar quando algo cai."));
+    "As operadoras de internet e TV que atendem o condomínio."));
 
   const lista = State.config.concessionarias;
   const tipos = [
@@ -594,7 +599,7 @@ function viewConcessionarias(root) {
 /* ---------------- Prédio e serviços: áreas comuns (iluminação) ---------------- */
 function viewAreasComuns(root) {
   root.append(pageHead("Prédio e serviços", "Iluminação das áreas comuns",
-    "Registre cada área comum e como está a iluminação dela. Ao fazer a ronda, atualize o status e marque a verificação — o painel inicial avisa quando algo está com falha."));
+    "O estado da iluminação de cada área. Atualize ao fazer a ronda."));
 
   const lista = State.config.areasComuns;
   const listWrap = el("div", {});
@@ -641,7 +646,7 @@ function viewAreasComuns(root) {
 /* ---------------- Prédio e serviços: elevadores ---------------- */
 function viewElevadores(root) {
   root.append(pageHead("Prédio e serviços", "Elevadores",
-    "Cadastre os elevadores de cada torre — sociais e de serviço, com nome — e acompanhe o funcionamento e o histórico de manutenção de cada um."));
+    "Os elevadores de cada torre — sociais e de serviço — com funcionamento e manutenção."));
 
   const lista = State.config.elevadores;
   const torres = State.config.torres;
@@ -741,7 +746,10 @@ function stackingLegend() {
 }
 
 function stackingPlan(interactive) {
-  const wrap = el("div", { class: "towers" });
+  const n = State.config.torres.length;
+  // Até 4 torres: uma fileira; de 5 em diante: duas fileiras equilibradas.
+  const cols = n <= 4 ? Math.max(n, 1) : Math.ceil(n / 2);
+  const wrap = el("div", { class: "towers", style: `--tcols:${cols}` });
   for (const t of State.config.torres) {
     const atip = {}; (t.andaresAtipicos || []).forEach(a => { atip[a.andar] = a.unidades; });
     const maxCols = Math.max(t.unidadesPorAndar || 0, ...Object.values(atip), 1);
@@ -790,7 +798,7 @@ function tooltipUnidade(id, d, obra) {
 function viewStacking(root) {
   const comp = cadastroCompleto();
   root.append(pageHead("Dia a dia", "Stacking plan",
-    "O mapa do condomínio, torre por torre. Clique em qualquer unidade para dizer quem mora nela e preencher os contatos. As cores mostram a situação de cada uma; o martelinho indica obra em andamento."));
+    "Clique numa unidade para preencher morador e status — as cores mostram a situação de cada uma."));
 
   if (!State.config.torres.length) {
     root.append(el("div", { class: "banner banner-warn" },
@@ -801,15 +809,14 @@ function viewStacking(root) {
 
   const pct = comp.total ? Math.round(100 * comp.feitos / comp.total) : 0;
   root.append(el("div", { class: "card" },
-    el("div", { class: "card-title-row" },
-      el("h3", {}, `Preenchimento: ${comp.feitos} de ${comp.total} unidades`),
-      comp.ok
-        ? el("span", { class: "pill pill-accent" }, "Cadastro completo — “Informar obra” liberado no menu")
-        : el("span", { class: "pill pill-muted" }, pct + "%")),
-    el("div", { class: "progress-line" }, el("div", { style: "width:" + pct + "%" })),
-    stackingLegend()));
-
-  root.append(el("div", { class: "card" }, stackingPlan(true)));
+    el("div", { class: "plan-top" },
+      el("div", { class: "progress-line" }, el("div", { style: "width:" + pct + "%" })),
+      el("span", { class: "small muted mono" }, `${comp.feitos}/${comp.total}`),
+      comp.ok ? el("span", { class: "pill pill-accent" }, "Completo") : null),
+    stackingPlan(true),
+    el("details", { class: "legend-box" },
+      el("summary", {}, "Entenda as cores"),
+      stackingLegend())));
 }
 
 /* ---------- modal da unidade ---------- */
@@ -987,8 +994,8 @@ function openUnitModal(unitId) {
 
 /* ---------------- 6. Obras (admin) ---------------- */
 function viewObras(root) {
-  root.append(pageHead("Operação", "Obras do condomínio",
-    "Gere links de comunicação de obra para os moradores, acompanhe as submissões e ajuste a etapa de cada obra — a cor do martelo no stacking plan acompanha a etapa."));
+  root.append(pageHead("Dia a dia", "Obras do condomínio",
+    "Links de comunicação de obra, submissões dos moradores e a etapa de cada reforma."));
 
   const comp = cadastroCompleto();
   if (!comp.ok) {
@@ -1092,7 +1099,7 @@ function showObraLink(id) {
 /* ---------------- 7. Integração Axisgrid ---------------- */
 function viewIntegracao(root) {
   root.append(pageHead("Dados", "Dados e exportação",
-    "Tudo o que você cadastra fica organizado num formato padronizado, com identificadores estáveis de torres, unidades e obras. Daqui você exporta uma cópia completa — para backup ou para integrar a outros sistemas no futuro."));
+    "Exporte uma cópia completa de tudo o que está cadastrado."));
 
   root.append(el("div", { class: "card" },
     el("h3", {}, "Contrato de dados"),
