@@ -173,6 +173,8 @@ input, select, textarea { font: inherit; color: var(--ink); }
 
 .content { flex: 1; min-width: 0; padding: 22px clamp(16px, 3vw, 34px) 60px; }
 .content-inner { max-width: 1120px; }
+/* telas de mapa (stacking plan) usam a largura toda, com folga */
+.content-inner.wide { max-width: 1760px; }
 
 .page-head { margin-bottom: 18px; }
 .page-head .eyebrow {
@@ -269,9 +271,26 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
   display: grid;
   grid-template-columns: repeat(var(--tcols, 1), minmax(0, 1fr));
   gap: 20px 22px;
-  justify-items: center;
+  justify-items: stretch;
   align-items: start;
 }
+
+/* casa de máquinas: os elevadores da torre, sobre o prédio */
+.machine-room {
+  display: flex; justify-content: center; align-items: center;
+  gap: 6px; flex-wrap: wrap;
+  width: fit-content; max-width: 100%;
+  margin: 0 auto; padding: 6px 12px;
+  background: var(--surface-2);
+  border-radius: 10px 10px 0 0;
+}
+.elev-box {
+  border: 0; cursor: pointer;
+  padding: 4px 10px; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+  color: #fff; line-height: 1.2;
+}
+.elev-box:hover { filter: brightness(1.12); }
 .tower { max-width: 100%; min-width: 0; }
 .tower h3 { text-align: center; margin-bottom: 8px; font-size: 14px; letter-spacing: .02em; }
 .tower-grid-wrap { overflow-x: auto; padding-bottom: 4px; }

@@ -106,7 +106,7 @@ function renderAdmin(tab) {
   updateTopbar();
   const content = $("#admin-content");
   content.innerHTML = "";
-  const inner = el("div", { class: "content-inner" });
+  const inner = el("div", { class: "content-inner" + (tab === "stacking" ? " wide" : "") });
   content.append(inner);
   markDirtyOn(inner);
   const fns = {
@@ -742,7 +742,10 @@ function stackingLegend() {
     item("var(--ob-inicio)", "Obra: início", true),
     item("var(--ob-meio)", "Obra: rumo à metade", true),
     item("var(--ob-reta)", "Obra: reta final", true),
-    item("var(--ob-fim)", "Obra: final", true));
+    item("var(--ob-fim)", "Obra: final", true),
+    item("var(--st-prop)", "Elevador operando"),
+    item("var(--ob-meio)", "Elevador em manutenção"),
+    item("var(--ob-inicio)", "Elevador parado"));
 }
 
 function stackingPlan(interactive) {
@@ -753,7 +756,7 @@ function stackingPlan(interactive) {
   for (const t of State.config.torres) {
     const atip = {}; (t.andaresAtipicos || []).forEach(a => { atip[a.andar] = a.unidades; });
     const maxCols = Math.max(t.unidadesPorAndar || 0, ...Object.values(atip), 1);
-    const grid = el("div", { class: "tower-grid", style: `grid-template-columns: auto repeat(${maxCols}, minmax(52px, 1fr))` });
+    const grid = el("div", { class: "tower-grid", style: `grid-template-columns: auto repeat(${maxCols}, minmax(48px, 1fr))` });
     for (let andar = t.andares; andar >= 1; andar--) {
       const qtd = atip[andar] != null ? atip[andar] : t.unidadesPorAndar;
       grid.append(el("div", { class: "floor-label" }, andar + "º"));
@@ -778,8 +781,20 @@ function stackingPlan(interactive) {
         grid.append(cell);
       }
     }
+    // casa de máquinas: elevadores cadastrados da torre, color-coded pelo status
+    const elevs = (State.config.elevadores || []).filter(e => e.torreId === t.id);
     wrap.append(el("div", { class: "tower" },
       el("h3", {}, `${t.nome || t.id}`),
+      elevs.length ? el("div", { class: "machine-room" },
+        elevs.map(ev => {
+          const st = ELEV_STATUS[ev.status || "operando"] || ELEV_STATUS.operando;
+          return el("button", {
+            class: "elev-box",
+            style: "background:" + st.cor,
+            title: `${ev.nome || "Elevador"} · ${ELEV_TIPO[ev.tipo] || "Social"} — ${st.rotulo}`,
+            onclick: interactive ? (() => { location.hash = "#/admin/elevadores"; }) : null,
+          }, ev.nome || (ELEV_TIPO[ev.tipo] || "Elev."));
+        })) : null,
       el("div", { class: "tower-grid-wrap" }, grid)));
   }
   return wrap;
