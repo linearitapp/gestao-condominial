@@ -254,24 +254,32 @@ function viewEstrutura(root) {
     "Quantas torres, andares e apartamentos por andar. Andares diferentes (ex.: cobertura) entram como exceção."));
 
   const torres = State.config.torres;
+  const mestreInfo = el("div", {});
   const listWrap = el("div", { class: "stack" });
 
   const renderTorre = (t, idx) => {
+    const mestreId = State.config.torreMestreId;
+    const isMestre = mestreId === t.id;
+    const segue = !isMestre && !!mestreId && !!t.seguirMestre;
+
     const nome = field("Nome da torre", t.nome, { placeholder: "Torre A" });
     const andares = field("Nº de andares", t.andares, { type: "number", min: 1 });
     const upa = field("Unidades por andar (tipologia comum)", t.unidadesPorAndar, { type: "number", min: 1 });
+    if (segue) { andares.input.disabled = true; upa.input.disabled = true; }
+
     const atipList = el("div", {});
     const renderAtip = () => {
       atipList.innerHTML = "";
       (t.andaresAtipicos || []).forEach((a, i) => {
         const fa = field("Nº do andar", a.andar, { type: "number", min: 1 });
         const fq = field("Qtde. de apartamentos neste andar", a.unidades, { type: "number", min: 1 });
+        if (segue) { fa.input.disabled = true; fq.input.disabled = true; }
         fa.input.addEventListener("change", () => { a.andar = +fa.input.value || 0; });
         fq.input.addEventListener("change", () => { a.unidades = +fq.input.value || 0; });
         atipList.append(el("div", { class: "atipico-item" },
           el("div", { class: "item-head" },
             el("strong", { class: "small" }, "Andar fora da tipologia comum"),
-            el("button", { class: "btn btn-sm btn-danger", onclick: () => { t.andaresAtipicos.splice(i, 1); renderAtip(); } }, "Remover")),
+            segue ? null : el("button", { class: "btn btn-sm btn-danger", onclick: () => { t.andaresAtipicos.splice(i, 1); renderAtip(); } }, "Remover")),
           el("div", { class: "grid-2" }, fa.wrap, fq.wrap)));
       });
     };
@@ -280,10 +288,31 @@ function viewEstrutura(root) {
     andares.input.addEventListener("change", () => { t.andares = +andares.input.value || 0; });
     upa.input.addEventListener("change", () => { t.unidadesPorAndar = +upa.input.value || 0; });
 
+    let chkSeguir = null;
+    if (mestreId && !isMestre) {
+      chkSeguir = el("input", { type: "checkbox", checked: !!t.seguirMestre });
+      chkSeguir.addEventListener("change", () => {
+        t.seguirMestre = chkSeguir.checked;
+        if (t.seguirMestre) aplicarMestre(State.config);
+        redraw();
+      });
+    }
+
     return el("div", { class: "card" },
       el("div", { class: "card-title-row" },
-        el("h3", {}, `${t.id} — ${t.nome || "Torre sem nome"}`),
-        el("div", { style: "display:flex;gap:8px" },
+        el("h3", {}, `${t.id} — ${t.nome || "Torre sem nome"} `,
+          isMestre ? el("span", { class: "pill pill-accent", style: "margin-left:6px" }, "★ Mestre") : null,
+          segue ? el("span", { class: "pill pill-muted", style: "margin-left:6px" }, "Segue a mestre") : null),
+        el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" },
+          isMestre
+            ? el("button", {
+              class: "btn btn-sm", title: "Deixa de haver torre mestre; cada torre volta a ser editada individualmente",
+              onclick: () => { State.config.torreMestreId = null; redraw(); }
+            }, "Desfazer mestre")
+            : el("button", {
+              class: "btn btn-sm", title: "O esqueleto desta torre vira o modelo: tudo o que mudar nele replica para as torres que a seguirem",
+              onclick: () => { State.config.torreMestreId = t.id; aplicarMestre(State.config); redraw(); }
+            }, "Tornar mestre"),
           el("button", {
             class: "btn btn-sm", title: "Cria uma nova torre com os mesmos andares e unidades",
             onclick: () => {
@@ -291,20 +320,28 @@ function viewEstrutura(root) {
               const copia = JSON.parse(JSON.stringify(t));
               copia.id = "T" + prox;
               copia.nome = (t.nome || t.id) + " (cópia)";
-              torres.push(copia); redraw();
+              copia.seguirMestre = !!mestreId && (isMestre || !!t.seguirMestre);
+              torres.push(copia);
+              if (copia.seguirMestre) aplicarMestre(State.config);
+              redraw();
               toast("Torre duplicada — ajuste o nome e clique em “Salvar estrutura”.");
             }
           }, "Duplicar"),
           el("button", {
             class: "btn btn-sm btn-danger", onclick: () => {
               if (confirm(`Remover a torre ${t.nome || t.id}? As unidades e status dessa torre deixarão de aparecer no stacking plan.`)) {
+                if (State.config.torreMestreId === t.id) State.config.torreMestreId = null;
                 torres.splice(idx, 1); redraw();
               }
             }
           }, "Remover torre"))),
+      chkSeguir ? el("label", { class: "check", style: "margin-bottom:10px" }, chkSeguir,
+        "Seguir o esqueleto da torre mestre (andares, unidades e elevadores)") : null,
+      segue ? el("p", { class: "small muted", style: "margin-bottom:10px" },
+        "Estrutura espelhada da torre mestre — edite lá e salve. Moradores, status e manutenção continuam individuais desta torre.") : null,
       el("div", { class: "grid-3" }, nome.wrap, andares.wrap, upa.wrap),
       el("div", { style: "margin-top:12px" }, atipList),
-      el("button", {
+      segue ? null : el("button", {
         class: "btn btn-sm btn-ghost", style: "margin-top:8px", onclick: () => {
           t.andaresAtipicos = t.andaresAtipicos || []; t.andaresAtipicos.push({ andar: t.andares || 1, unidades: 1 }); renderAtip();
         }
@@ -312,13 +349,17 @@ function viewEstrutura(root) {
   };
 
   const redraw = () => {
+    mestreInfo.innerHTML = "";
+    const m = torres.find(x => x.id === State.config.torreMestreId);
+    if (m) mestreInfo.append(el("div", { class: "banner banner-info", style: "margin-bottom:14px" },
+      `Torre mestre: ${m.nome || m.id}. O esqueleto dela — andares, unidades e o cadastro dos elevadores — replica ao salvar para as torres marcadas com “Seguir a mestre”. Moradores, status e tudo o que é físico de cada torre continuam individuais.`));
     listWrap.innerHTML = "";
     torres.forEach((t, i) => listWrap.append(renderTorre(t, i)));
     if (!torres.length) listWrap.append(el("div", { class: "banner banner-info" }, "Nenhuma torre cadastrada ainda. Adicione a primeira torre abaixo."));
   };
   redraw();
 
-  root.append(listWrap,
+  root.append(mestreInfo, listWrap,
     el("div", { class: "modal-actions", style: "justify-content:space-between" },
       el("button", {
         class: "btn", onclick: () => {
@@ -674,6 +715,11 @@ function viewElevadores(root) {
     return;
   }
 
+  if (State.config.torreMestreId) {
+    root.append(el("div", { class: "banner banner-info", style: "margin-bottom:14px" },
+      "Os elevadores cadastrados na torre mestre replicam para as torres que a seguem. A realidade material de cada torre — funcionamento, marca, manutenção e histórico — continua individual."));
+  }
+
   const listWrap = el("div", {});
   const redraw = () => {
     listWrap.innerHTML = "";
@@ -698,6 +744,12 @@ function viewElevadores(root) {
       fpm.input.addEventListener("change", () => { ev.proximaManut = fpm.input.value; });
       fmarca.input.addEventListener("input", () => { ev.marca = fmarca.input.value; });
       fman.input.addEventListener("change", () => { ev.manutencaoPrestadorId = fman.input.value; redraw(); });
+
+      // réplica de torre que segue a mestre: cadastro travado (edita-se na
+      // mestre); o que é físico da torre — marca, status, manutenção — fica livre
+      const espelhado = !!(ev.mestreElevId && torreSegueMestre(ev.torreId));
+      const deMestre = !!(State.config.torreMestreId && ev.torreId === State.config.torreMestreId);
+      if (espelhado) { ftorre.input.disabled = true; fn.input.disabled = true; ft.input.disabled = true; fman.input.disabled = true; }
 
       // contato do técnico: cadastrado uma vez, no fornecedor
       const prestSel = prestadores.find(p => p.id === ev.manutencaoPrestadorId);
@@ -739,8 +791,12 @@ function viewElevadores(root) {
       listWrap.append(el("div", { class: "regra-item" },
         el("div", { class: "item-head" },
           el("strong", { class: "small" }, `${ev.nome || "Novo elevador"} · ${torreNome}`,
-            el("span", { class: "pill pill-muted", style: "margin-left:8px" }, ELEV_TIPO[ev.tipo] || "Social")),
-          el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
+            el("span", { class: "pill pill-muted", style: "margin-left:8px" }, ELEV_TIPO[ev.tipo] || "Social"),
+            deMestre ? el("span", { class: "pill pill-accent", style: "margin-left:6px" }, "★ Mestre") : null,
+            espelhado ? el("span", { class: "pill pill-muted", style: "margin-left:6px" }, "Espelhado da mestre") : null),
+          espelhado
+            ? el("span", { class: "small muted" }, "cadastro editado na torre mestre")
+            : el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
         el("div", { class: "grid-3" }, ftorre.wrap, fn.wrap, ft.wrap),
         el("div", { class: "grid-2", style: "margin-top:8px" }, fmarca.wrap, fman.wrap),
         tecInfo,

@@ -111,6 +111,59 @@ function upgradeConfig(cfg) {
   return cfg;
 }
 
+/* ---------------- torre mestre (esqueleto replicável) ----------------
+   Uma torre pode ser marcada como "mestre" (config.torreMestreId).
+   Torres com seguirMestre=true espelham a ESTRUTURA da mestre ao salvar:
+   andares, unidades por andar, andares atípicos e a configuração dos
+   elevadores (nome, tipo, marca, fornecedor). O que é de cada torre —
+   moradores, status das unidades, funcionamento/manutenção de cada
+   elevador — nunca é tocado pela replicação. */
+function torreSegueMestre(torreId) {
+  const mid = State.config && State.config.torreMestreId;
+  if (!mid || torreId === mid) return false;
+  const t = (State.config.torres || []).find(x => x.id === torreId);
+  return !!(t && t.seguirMestre);
+}
+
+function aplicarMestre(cfg) {
+  const mid = cfg.torreMestreId;
+  if (!mid) return;
+  const mestre = (cfg.torres || []).find(t => t.id === mid);
+  if (!mestre) { cfg.torreMestreId = null; return; }
+
+  const seguidoras = (cfg.torres || []).filter(t => t.id !== mid && t.seguirMestre);
+
+  // 1) esqueleto: andares e unidades
+  for (const t of seguidoras) {
+    t.andares = mestre.andares;
+    t.unidadesPorAndar = mestre.unidadesPorAndar;
+    t.andaresAtipicos = JSON.parse(JSON.stringify(mestre.andaresAtipicos || []));
+  }
+
+  // 2) elevadores: a configuração replica; o status é de cada torre
+  const elevs = cfg.elevadores = cfg.elevadores || [];
+  const doMestre = elevs.filter(e => e.torreId === mid);
+  for (const t of seguidoras) {
+    for (const me of doMestre) {
+      let alvo = elevs.find(e => e.torreId === t.id && e.mestreElevId === me.id);
+      if (!alvo) {
+        alvo = { id: uid("el"), torreId: t.id, mestreElevId: me.id, status: "operando", ultimaManut: "", proximaManut: "", historico: [] };
+        elevs.push(alvo);
+      }
+      alvo.nome = me.nome;
+      alvo.tipo = me.tipo;
+      // marca é realidade material da torre: replica só como valor inicial
+      if (!alvo.marca) alvo.marca = me.marca || "";
+      alvo.manutencaoPrestadorId = me.manutencaoPrestadorId || "";
+    }
+    // réplica cujo elevador mestre foi removido sai junto
+    for (let i = elevs.length - 1; i >= 0; i--) {
+      const e = elevs[i];
+      if (e.torreId === t.id && e.mestreElevId && !doMestre.some(me => me.id === e.mestreElevId)) elevs.splice(i, 1);
+    }
+  }
+}
+
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 function fmtGrade(grade) {
   if (!grade || !grade.length) return "Sem grade definida";
@@ -256,6 +309,7 @@ const Store = {
 
   async saveConfig() {
     State.config.schema = SCHEMA_VERSION;
+    aplicarMestre(State.config);
     if (this.db) await this.db.doc("app/config").set(JSON.parse(JSON.stringify(State.config)));
     else if (State.mode === "api") await this._apiSend("PUT", "api/config", State.config);
     else this._saveLocal();
