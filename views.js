@@ -283,13 +283,25 @@ function viewEstrutura(root) {
     return el("div", { class: "card" },
       el("div", { class: "card-title-row" },
         el("h3", {}, `${t.id} — ${t.nome || "Torre sem nome"}`),
-        el("button", {
-          class: "btn btn-sm btn-danger", onclick: () => {
-            if (confirm(`Remover a torre ${t.nome || t.id}? As unidades e status dessa torre deixarão de aparecer no stacking plan.`)) {
-              torres.splice(idx, 1); redraw();
+        el("div", { style: "display:flex;gap:8px" },
+          el("button", {
+            class: "btn btn-sm", title: "Cria uma nova torre com os mesmos andares e unidades",
+            onclick: () => {
+              const prox = Math.max(0, ...torres.map(x => +String(x.id).replace(/\D/g, "") || 0)) + 1;
+              const copia = JSON.parse(JSON.stringify(t));
+              copia.id = "T" + prox;
+              copia.nome = (t.nome || t.id) + " (cópia)";
+              torres.push(copia); redraw();
+              toast("Torre duplicada — ajuste o nome e clique em “Salvar estrutura”.");
             }
-          }
-        }, "Remover torre")),
+          }, "Duplicar"),
+          el("button", {
+            class: "btn btn-sm btn-danger", onclick: () => {
+              if (confirm(`Remover a torre ${t.nome || t.id}? As unidades e status dessa torre deixarão de aparecer no stacking plan.`)) {
+                torres.splice(idx, 1); redraw();
+              }
+            }
+          }, "Remover torre"))),
       el("div", { class: "grid-3" }, nome.wrap, andares.wrap, upa.wrap),
       el("div", { style: "margin-top:12px" }, atipList),
       el("button", {
@@ -490,10 +502,14 @@ function viewPrestadores(root) {
       const ft = field("Tipo", p.tipo || "fixo", { type: "select", options: [{ value: "fixo", nome: "Fixo (vem toda semana)" }, { value: "esporadico", nome: "Esporádico (sob demanda)" }] });
       const ftel = field("Telefone", p.telefone || "");
       const fobs = field("Observações", p.obs || "", { placeholder: "Ex.: entra pela portaria de serviço" });
+      const ftec = field("Técnico responsável (opcional)", p.tecnico || "", { placeholder: "Nome do técnico" });
+      const ftecc = field("Contato do técnico", p.tecnicoContato || "", { hint: "Cadastre uma vez aqui — aparece em todos os elevadores atendidos por esta empresa." });
       fn.input.addEventListener("input", () => { p.nome = fn.input.value; });
       fs.input.addEventListener("input", () => { p.servico = fs.input.value; });
       ftel.input.addEventListener("input", () => { p.telefone = ftel.input.value; });
       fobs.input.addEventListener("input", () => { p.obs = fobs.input.value; });
+      ftec.input.addEventListener("input", () => { p.tecnico = ftec.input.value; });
+      ftecc.input.addEventListener("input", () => { p.tecnicoContato = ftecc.input.value; });
       ft.input.addEventListener("change", () => { p.tipo = ft.input.value; redraw(); });
 
       const gradeWrap = el("div", {});
@@ -537,6 +553,7 @@ function viewPrestadores(root) {
           el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
         el("div", { class: "grid-2" }, fn.wrap, fs.wrap),
         el("div", { class: "grid-3", style: "margin-top:8px" }, ft.wrap, ftel.wrap, fobs.wrap),
+        el("div", { class: "grid-2", style: "margin-top:8px" }, ftec.wrap, ftecc.wrap),
         gradeWrap));
     });
     if (!lista.length) listWrap.append(el("p", { class: "small muted" }, "Nenhum prestador cadastrado ainda."));
@@ -666,11 +683,30 @@ function viewElevadores(root) {
       const ft = field("Tipo", ev.tipo || "social", { type: "select", options: [{ value: "social", nome: "Social" }, { value: "servico", nome: "Serviço" }] });
       const fum = field("Última manutenção", ev.ultimaManut || "", { type: "date" });
       const fpm = field("Próxima manutenção prevista", ev.proximaManut || "", { type: "date" });
+      const fmarca = field("Marca do elevador", ev.marca || "", { placeholder: "Ex.: Atlas Schindler, Otis, TK" });
+      const prestadores = State.config.prestadores || [];
+      const fman = field("Empresa que faz a manutenção", ev.manutencaoPrestadorId || "", {
+        type: "select",
+        options: [{ value: "", nome: prestadores.length ? "Selecione o fornecedor…" : "Nenhum fornecedor cadastrado ainda" }]
+          .concat(prestadores.map(p => ({ value: p.id, nome: p.nome || "(fornecedor sem nome)" }))),
+        hint: "Vem do cadastro de fornecedores (tela Prestadores de serviço).",
+      });
       ftorre.input.addEventListener("change", () => { ev.torreId = ftorre.input.value; });
       fn.input.addEventListener("input", () => { ev.nome = fn.input.value; });
       ft.input.addEventListener("change", () => { ev.tipo = ft.input.value; });
       fum.input.addEventListener("change", () => { ev.ultimaManut = fum.input.value; });
       fpm.input.addEventListener("change", () => { ev.proximaManut = fpm.input.value; });
+      fmarca.input.addEventListener("input", () => { ev.marca = fmarca.input.value; });
+      fman.input.addEventListener("change", () => { ev.manutencaoPrestadorId = fman.input.value; redraw(); });
+
+      // contato do técnico: cadastrado uma vez, no fornecedor
+      const prestSel = prestadores.find(p => p.id === ev.manutencaoPrestadorId);
+      const tecInfo = prestSel
+        ? el("p", { class: "small muted", style: "margin-top:4px" },
+          (prestSel.tecnico || prestSel.tecnicoContato)
+            ? `Técnico: ${prestSel.tecnico || "—"}${prestSel.tecnicoContato ? " · " + prestSel.tecnicoContato : ""}${prestSel.telefone ? "  |  Empresa: " + prestSel.telefone : ""}`
+            : "Este fornecedor ainda não tem técnico cadastrado — preencha na tela Prestadores de serviço.")
+        : null;
 
       const statusChips = el("div", { class: "chips" });
       for (const [k, info] of Object.entries(ELEV_STATUS)) {
@@ -706,6 +742,8 @@ function viewElevadores(root) {
             el("span", { class: "pill pill-muted", style: "margin-left:8px" }, ELEV_TIPO[ev.tipo] || "Social")),
           el("button", { class: "btn btn-sm btn-danger", onclick: () => { lista.splice(i, 1); redraw(); } }, "Remover")),
         el("div", { class: "grid-3" }, ftorre.wrap, fn.wrap, ft.wrap),
+        el("div", { class: "grid-2", style: "margin-top:8px" }, fmarca.wrap, fman.wrap),
+        tecInfo,
         el("div", { style: "margin-top:10px" },
           el("p", { class: "small muted", style: "margin-bottom:4px" }, "Funcionamento:"), statusChips),
         el("div", { class: "grid-2", style: "margin-top:10px" }, fum.wrap, fpm.wrap),
@@ -788,10 +826,17 @@ function stackingPlan(interactive) {
       elevs.length ? el("div", { class: "machine-room" },
         elevs.map(ev => {
           const st = ELEV_STATUS[ev.status || "operando"] || ELEV_STATUS.operando;
+          const prest = (State.config.prestadores || []).find(p => p.id === ev.manutencaoPrestadorId);
+          let dica = `${ev.nome || "Elevador"} · ${ELEV_TIPO[ev.tipo] || "Social"} — ${st.rotulo}`;
+          if (ev.marca) dica += `\nMarca: ${ev.marca}`;
+          if (prest) {
+            dica += `\nManutenção: ${prest.nome}`;
+            if (prest.tecnico || prest.tecnicoContato) dica += `\nTécnico: ${prest.tecnico || ""}${prest.tecnicoContato ? " · " + prest.tecnicoContato : ""}`;
+          }
           return el("button", {
             class: "elev-box",
             style: "background:" + st.cor,
-            title: `${ev.nome || "Elevador"} · ${ELEV_TIPO[ev.tipo] || "Social"} — ${st.rotulo}`,
+            title: dica,
             onclick: interactive ? (() => { location.hash = "#/admin/elevadores"; }) : null,
           }, ev.nome || (ELEV_TIPO[ev.tipo] || "Elev."));
         })) : null,
